@@ -22,6 +22,9 @@
 
 from pid import PIDAgent
 from keyframes import hello
+from scipy import interpolate
+from scipy.interpolate import interp1d
+
 
 
 class AngleInterpolationAgent(PIDAgent):
@@ -33,17 +36,34 @@ class AngleInterpolationAgent(PIDAgent):
         super(AngleInterpolationAgent, self).__init__(simspark_ip, simspark_port, teamname, player_id, sync_mode)
         self.keyframes = ([], [], [])
 
+
     def think(self, perception):
         target_joints = self.angle_interpolation(self.keyframes, perception)
         target_joints['RHipYawPitch'] = target_joints['LHipYawPitch'] # copy missing joint in keyframes
         self.target_joints.update(target_joints)
         return super(AngleInterpolationAgent, self).think(perception)
 
+    
+    
+
     def angle_interpolation(self, keyframes, perception):
         target_joints = {}
         # YOUR CODE HERE
 
+        if self.keyframes == ([], [], []):
+            return target_joints
+
+
+        names, times, keys = keyframes
+        for i, name in enumerate(names):
+            # Interpolate the keyframe data for this joint using spline interpolation
+            f = interp1d(times[i], keys[i], kind='cubic')
+            # Evaluate the interpolated function at the current time
+            target_joints[name] = f(perception.time)
         return target_joints
+    
+
+
 
 if __name__ == '__main__':
     agent = AngleInterpolationAgent()

@@ -17,7 +17,7 @@ sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', '
 
 import numpy as np
 from collections import deque
-from software_installation.spark_agent import SparkAgent, JOINT_CMD_NAMES
+from spark_agent import SparkAgent, JOINT_CMD_NAMES
 
 
 class PIDController(object):
@@ -54,6 +54,22 @@ class PIDController(object):
         @return control signal
         '''
         # YOUR CODE HERE
+        # BEGIN SOLUTION
+
+
+
+        #calculate the error
+        e = target - sensor
+
+        #calculate the control signal
+        self.u= self.u +(self.Kp+ self.Ki*self.dt+self.Kd/self.dt)*e-(self.Kp+2*self.Kd/self.dt)+self.e1+self.Kd/self.dt*self.e2
+        self.e2 = self.e1
+        self.e1 = e
+
+        #calculate the prediction
+        pred = self.u + ((self.u - sensor) + (self.y.popleft() - sensor)) / (2 * self.dt) * self.dt
+        self.y.append(pred)
+
 
         return self.u
 

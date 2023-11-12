@@ -1,0 +1,6 @@
+{
+    "python.analysis.extraPaths": [
+        "./software_installation",
+        "./software_installation"
+    ]
+}

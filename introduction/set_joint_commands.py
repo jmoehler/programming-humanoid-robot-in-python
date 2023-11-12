@@ -14,7 +14,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'software_installation'))
 
-from spark_agent import SparkAgent
+from software_installation.spark_agent import SparkAgent
 
 
 class MyAgent(SparkAgent):

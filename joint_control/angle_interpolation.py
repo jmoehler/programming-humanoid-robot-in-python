@@ -21,10 +21,7 @@
 
 
 from pid import PIDAgent
-from keyframes import hello
-from scipy import interpolate
-from scipy.interpolate import interp1d
-
+from keyframes import *
 
 
 class AngleInterpolationAgent(PIDAgent):
@@ -35,35 +32,70 @@ class AngleInterpolationAgent(PIDAgent):
                  sync_mode=True):
         super(AngleInterpolationAgent, self).__init__(simspark_ip, simspark_port, teamname, player_id, sync_mode)
         self.keyframes = ([], [], [])
-
+        self.startTime = -1
 
     def think(self, perception):
         target_joints = self.angle_interpolation(self.keyframes, perception)
-        target_joints['RHipYawPitch'] = target_joints['LHipYawPitch'] # copy missing joint in keyframes
+        #target_joints['RHipYawPitch'] = target_joints['LHipYawPitch'] # copy missing joint in keyframes
         self.target_joints.update(target_joints)
         return super(AngleInterpolationAgent, self).think(perception)
-
-    
-    
 
     def angle_interpolation(self, keyframes, perception):
         target_joints = {}
         # YOUR CODE HERE
-
-        if self.keyframes == ([], [], []):
+        if(self.keyframes == ([],[],[])):
             return target_joints
-
-
+        
+        if(self.startTime == -1):
+            self.startTime = perception.time
+        curr_Time = perception.time - self.startTime
+ 
         names, times, keys = keyframes
-        for i, name in enumerate(names):
-            # Interpolate the keyframe data for this joint using spline interpolation
-            f = interp1d(times[i], keys[i], kind='cubic')
-            # Evaluate the interpolated function at the current time
-            target_joints[name] = f(perception.time)
+        
+        ship = 0
+        for (m, name) in enumerate(names):
+            kframe = 0
+            minTime = 0
+            maxTime = 0    
+            jointTimes = times[m]    
+                             
+            if (jointTimes[-1] < curr_Time):
+                ship += 1
+                if(ship == len(names)):
+                    self.startTime = -1
+                    self.keyframes = ([],[],[])
+                continue
+            
+            for n in range(len(jointTimes)):
+                maxTime = jointTimes[n]
+                
+                if ((minTime <= curr_Time and curr_Time <= maxTime)): 
+                    kframe = n
+                    break
+                minTime = maxTime
+            
+            i = (curr_Time - minTime) / (maxTime - minTime)
+            
+            if (kframe == 0):
+                p0 = 0
+                p1 = 0
+                p3 = keys[m][kframe][0]
+                p2 = p3 + keys[m][kframe][1][2]
+
+            else:
+                p0 = keys[m][kframe-1][0]
+                p1 = p0 + keys[m][kframe-1][2][2]
+                p3 = keys[m][kframe][0]
+                p2 = p3 + keys[m][kframe][1][2]
+                
+            angle = ((1 - i)**3)* p0 + 3*i *((1 - i)**2) * p1 + 3*(i**2) * (1-i) * p2 + (i**3) * p3
+
+            target_joints[name] = angle
+            if(name == "LHipYawPitch"):
+                target_joints["RHipYawPitch"] = angle
+
+
         return target_joints
-    
-
-
 
 if __name__ == '__main__':
     agent = AngleInterpolationAgent()

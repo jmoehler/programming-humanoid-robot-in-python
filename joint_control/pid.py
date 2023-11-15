@@ -1,9 +1,7 @@
 '''In this exercise you need to implement the PID controller for joints of robot.
-
 * Task:
     1. complete the control function in PIDController with prediction
     2. adjust PID parameters for NAO in simulation
-
 * Hints:
     1. the motor in simulation can simple modelled by angle(t) = angle(t-1) + speed * dt
     2. use self.y to buffer model prediction
@@ -12,7 +10,6 @@
 # add PYTHONPATH
 import os
 import sys
-
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'software_installation'))
 
 import numpy as np
@@ -36,9 +33,9 @@ class PIDController(object):
         self.e2 = np.zeros(size)
         # ADJUST PARAMETERS BELOW
         delay = 0
-        self.Kp = 0
-        self.Ki = 0
-        self.Kd = 0
+        self.Kp = 15
+        self.Ki = 0,1   
+        self.Kd = -0,2 
         self.y = deque(np.zeros(size), maxlen=delay + 1)
 
     def set_delay(self, delay):
@@ -54,22 +51,13 @@ class PIDController(object):
         @return control signal
         '''
         # YOUR CODE HERE
-        # BEGIN SOLUTION
-
-
-
-        #calculate the error
-        e = target - sensor
-
-        #calculate the control signal
-        self.u= self.u +(self.Kp+ self.Ki*self.dt+self.Kd/self.dt)*e-(self.Kp+2*self.Kd/self.dt)+self.e1+self.Kd/self.dt*self.e2
-        self.e2 = self.e1
-        self.e1 = e
-
-        #calculate the prediction
+        e = target - sensor       
+        self.u +=  (self.Kp + self.Ki * self.dt + self.Kd / self.dt) * e - (self.Kp +(2 * self.Kd) / self.dt) * self.e1 + (self.Kd / self.dt) * self.e2
+        self.e2 = self.e1.copy()
+        self.e1 = e.copy()
+        
         pred = self.u + ((self.u - sensor) + (self.y.popleft() - sensor)) / (2 * self.dt) * self.dt
         self.y.append(pred)
-
 
         return self.u
 

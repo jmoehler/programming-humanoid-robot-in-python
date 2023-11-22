@@ -1,103 +1,81 @@
-"""In this file you need to implement remote procedure call (RPC) server
-* There are different RPC libraries for python, such as xmlrpclib, json-rpc. You are free to choose.
-* The following functions have to be implemented and exported:
- * get_angle
- * set_angle
- * get_posture
- * execute_keyframes
- * get_transform
- * set_transform
-* You can test RPC server with ipython before implementing agent_client.py
-"""
+'''In this file you need to implement remote procedure call (RPC) client
 
-import os
-import sys
-sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'kinematics'))
+* The agent_server.py has to be implemented first (at least one function is implemented and exported)
+* Please implement functions in ClientAgent first, which should request remote call directly
+* The PostHandler can be implement in the last step, it provides non-blocking functions, e.g. agent.post.execute_keyframes
+ * Hints: [threading](https://docs.python.org/2/library/threading.html) may be needed for monitoring if the task is done
+'''
 
-from kinematics.inverse_kinematics import InverseKinematicsAgent
+
 import threading
-import pickle
-from xmlrpc.server import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
+import xmlrpc.client as rpc
+from joint_control.keyframes import leftBackToStand
 
-# Define a custom request handler for the XML-RPC server
-class RequestHandler(SimpleXMLRPCRequestHandler):
-    rpc_paths = ('/RPC2',)
-
-# ServerAgent extends InverseKinematicsAgent and provides RPC services
-class ServerAgent(InverseKinematicsAgent):
-    '''ServerAgent provides RPC service
+class PostHandler(object):
+    '''The post handler wraps functions to be executed in parallel.
     '''
-
-    def __init__(self):
-        super(ServerAgent, self).__init__()
-
-        # Load posture classifier from a pickle file
-        robot_pose_data = open(r'..\joint_control\robot_pose.pkl', 'rb')
-        self.posture_classifier = pickle.load(robot_pose_data)
-        self.posture = 'unknown'
-        robot_pose_data.close()
-
-        # Create an XML-RPC server on localhost:6666
-        self.server = SimpleXMLRPCServer(('localhost', 6666), requestHandler=RequestHandler, allow_none=True)
-        self.server.register_introspection_functions()
-        self.server.register_multicall_functions()
-        self.server.register_instance(self)
-
-        # Start the server in a separate thread
-        self.thread = threading.Thread(target=self.server.serve_forever)
-        self.thread.start()
-        print('starting server ...')
-
-    def think(self, perception):
-        # Recognize the current posture based on perception data
-        self.posture = self.recognize_posture(perception)
-        return super(ServerAgent, self).think(perception)
-
-    def recognize_posture(self, perception):
-        # Use a posture classifier to determine the current posture
-        posture = 'unknown'
-        postures = ['HeadBack', 'Left', 'Right', 'Crouch', 'Knee', 'Stand', 'Sit', 'StandInit', 'Frog', 'Back', 'Belly']
-        joint_names = ['LHipYawPitch', 'LHipRoll', 'LHipPitch', 'LKneePitch', 'RHipYawPitch', 'RHipRoll', 'RHipPitch',
-                       'RKneePitch']
-        values = []
-        for joint_name in joint_names:
-            values.append(perception.joint[joint_name])
-        values += perception.imu
-        ID = self.posture_classifier.predict([values])[0]
-        posture = postures[ID]
-        return posture
-
-    def get_angle(self, joint_name):
-        """get sensor value of given joint"""
-        return self.perception.joint.get(joint_name)
-
-    def set_angle(self, joint_name, angle):
-        """set target angle of joint for PID controller
-        """
-        self.target_joints[joint_name] = angle
-
-    def get_posture(self):
-        """return current posture of robot"""
-        return str(self.posture)
+    def __init__(self, obj):
+        self.client = obj
 
     def execute_keyframes(self, keyframes):
-        """execute keyframes, note this function is a blocking call,
-        e.g. it returns only after keyframes are executed
-        """
+        '''Non-blocking call of ClientAgent.execute_keyframes'''
         # YOUR CODE HERE
-        self.keyframes = keyframes
-
-    def get_transform(self, name):
-        """get transform with given name
-        """
-        return self.transforms[name]
+        # Create a new thread to execute the keyframes in parallel
+        thread = threading.Thread(target=self.client.execute_keyframes, args=[keyframes])
+        thread.start()
 
     def set_transform(self, effector_name, transform):
-        """solve the inverse kinematics and control joints using the results
-        """
-        self.transforms[effector_name] = transform
+        '''Non-blocking call of ClientAgent.set_transform'''
+        # YOUR CODE HERE
+        # Create a new thread to set the transform in parallel
+        thread = threading.Thread(target=self.client.set_transform, args=[effector_name, transform])
+        thread.start()
+
+
+class ClientAgent(object):
+    '''ClientAgent requests RPC service from a remote server
+    '''
+
+    # YOUR CODE HERE
+    def __init__(self):
+        # Initialize the RPC client with the server's address
+        self.client = rpc.ServerProxy("http://localhost:6666", allow_none=True)
+        self.post = PostHandler(self.client)
+        print('Client started')
+
+    def get_angle(self, joint_name):
+        '''Get sensor value of the given joint'''
+        return self.client.get_angle(joint_name)
+
+    def set_angle(self, joint_name, angle):
+        '''Set the target angle of the joint for PID controller
+        '''
+        return self.client.set_angle(joint_name, angle)
+
+    def get_posture(self):
+        '''Return the current posture of the robot'''
+        return self.client.get_posture()
+
+    def execute_keyframes(self, keyframes):
+        '''Execute keyframes; note that this function is a blocking call,
+        e.g., it returns only when keyframes are executed
+        '''
+        return self.client.execute_keyframes(keyframes)
+
+    def get_transform(self, name):
+        '''Get transform with the given name
+        '''
+        return self.client.get_transform(name)
+
+    def set_transform(self, effector_name, transform):
+        '''Solve the inverse kinematics and control joints using the results 'blocking'
+        '''
+        return self.client.set_transform(effector_name, transform)
+
 
 if __name__ == '__main__':
-    # Create an instance of the ServerAgent and start running
-    agent = ServerAgent()
-    agent.run()
+    # Instantiate a ClientAgent
+    agent = ClientAgent()
+    # TEST CODE HERE
+    # Execute the predefined keyframes to test the functionality
+    agent.execute_keyframes(leftBackToStand())

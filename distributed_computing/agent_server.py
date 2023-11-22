@@ -24,6 +24,7 @@ class ServerAgent(InverseKinematicsAgent):
     '''
     # YOUR CODE HERE
     
+    
     def get_angle(self, joint_name):
         '''get sensor value of given joint'''
         # YOUR CODE HERE
